@@ -1,0 +1,139 @@
+codigo,nombre,type
+1inch,1inch Network,unbacked
+aave,Aave,unbacked
+ada,Cardano,unbacked
+ae_eth,Aeternity (Ethereum),unbacked
+aion_eth,Aion (Ethereum),unbacked
+algo,Algorand,unbacked
+alpha,Alpha Finance Lab,unbacked
+ant,Aragon,unbacked
+avaxc,Avalanche C-Chain,unbacked
+avaxp,Avalanche P-Chain,unbacked
+avaxx,Avalanche X-Chain,unbacked
+bal,Balancer,unbacked
+bat,Basic Attention Token,unbacked
+bch,Bitcoin Cash,unbacked
+bnb,Binance Coin,unbacked
+bnb_eth,BNB (Ethereum),unbacked
+bsv,Bitcoin SV,unbacked
+btc,Bitcoin,unbacked
+btg,Bitcoin Gold,unbacked
+btm_eth,Bytom (Ethereum),unbacked
+busd,Binance USD,stablecoin
+comp,Compound,unbacked
+cro,Crypto.com Coin,unbacked
+crv,Curve DAO Token,unbacked
+crvusd_eth,Curve USD (Ethereum),stablecoin
+cvc,Civic,unbacked
+dai,Dai,stablecoin
+dash,Dash,unbacked
+dcr,Decred,unbacked
+dgb,DigiByte,unbacked
+doge,Dogecoin,unbacked
+dot,Polkadot,unbacked
+drgn,Dragonchain,unbacked
+elf,Aelf,unbacked
+eos,EOS,unbacked
+eos_eth,EOS (Ethereum),unbacked
+etc,Ethereum Classic,unbacked
+eth,Ethereum,unbacked
+eurc_eth,Euro Coin (Ethereum),stablecoin
+fdusd_eth,FDUSD (Ethereum),stablecoin
+flow,Flow,unbacked
+flow_evm,Flow (EVM),unbacked
+flow_native,Flow (Native),unbacked
+frax_eth,Frax (Ethereum),stablecoin
+ftt,FTX Token,unbacked
+fun,FunFair,unbacked
+gas,Gas (NEO),unbacked
+gno,Gnosis,unbacked
+gnt,Golem,unbacked
+grin,Grin,unbacked
+gusd,Gemini Dollar,stablecoin
+hbtc,Huobi BTC,unbacked
+hedg,HedgeTrade,unbacked
+ht,Huobi Token,unbacked
+husd,HUSD,stablecoin
+icp,Internet Computer,unbacked
+icx_eth,ICON (Ethereum),unbacked
+knc,Kyber Network Crystal,unbacked
+ldo,Lido DAO,unbacked
+lend,Aave (LEND),unbacked
+leo_eos,LEO (EOS),unbacked
+leo_eth,LEO (Ethereum),unbacked
+link,Chainlink,unbacked
+loom,Loom Network,unbacked
+lpt,Livepeer Token,unbacked
+lrc_eth,Loopring (Ethereum),unbacked
+ltc,Litecoin,unbacked
+lusd_eth,LUSD (Ethereum),stablecoin
+maid,MaidSafeCoin,unbacked
+mana,Decentraland,unbacked
+matic_eth,Polygon (Ethereum),unbacked
+mkr,Maker,unbacked
+nas_eth,Nebulas (Ethereum),unbacked
+neo,NEO,unbacked
+nxm,Nexus Mutual,unbacked
+omg,OMG Network,unbacked
+pax,PAX,stablecoin
+paxg,PAX Gold,stablecoin
+pay,TenX,unbacked
+perp,Perpetual Protocol,unbacked
+pol_eth,Polymath (Ethereum),unbacked
+poly,Polymath,unbacked
+powr,Power Ledger,unbacked
+ppt,Populous,unbacked
+pyusd_eth,pyUSD (Ethereum),stablecoin
+qash,Qash,unbacked
+qnt,Quant,unbacked
+qtum_eth,Qtum (Ethereum),unbacked
+ren,Ren,unbacked
+renbtc,renBTC,unbacked
+rep,Augur,unbacked
+rev_eth,Revain (Ethereum),unbacked
+sai,Sai,stablecoin
+sdai_eth,sdai (Ethereum),stablecoin
+shib_eth,Shiba Inu (Ethereum),unbacked
+snt,Status,unbacked
+snx,Synthetix Network Token,unbacked
+srm,Serum,unbacked
+susde_eth,SUSD (Ethereum),stablecoin
+sushi,Sushi,unbacked
+swrv,Swerve,unbacked
+trx,TRON,unbacked
+trx_eth,TRON (Ethereum),unbacked
+tusd,TrueUSD,stablecoin
+tusd_eth,TrueUSD (Ethereum),stablecoin
+tusd_trx,TrueUSD (TRON),stablecoin
+uma,UMA,unbacked
+uni,Uniswap,unbacked
+usdc,USD Coin,stablecoin
+usdc_avaxc,USDC (Avalanche C-Chain),stablecoin
+usdc_eth,USDC (Ethereum),stablecoin
+usdc_trx,USDC (TRON),stablecoin
+usdd_eth,USDD (Ethereum),stablecoin
+usde_eth,USDE (Ethereum),stablecoin
+usdk,USDK,stablecoin
+usdm_eth,USDM (Ethereum),stablecoin
+usdt,Tether,stablecoin
+usdt_avaxc,USDT (Avalanche C-Chain),stablecoin
+usdt_eth,USDT (Ethereum),stablecoin
+usdt_omni,USDT (Omni),stablecoin
+usdt_trx,USDT (TRON),stablecoin
+vet_eth,VeChain (Ethereum),unbacked
+vtc,Vertcoin,unbacked
+wbtc,Wrapped Bitcoin,unbacked
+weth,Wrapped Ether,unbacked
+wnxm,Wrapped NXM,unbacked
+wtc,Waltonchain,unbacked
+xaut,XAUT (Gold),stablecoin
+xem,NEM,unbacked
+xlm,Stellar Lumens,unbacked
+xmr,Monero,unbacked
+xrp,XRP,unbacked
+xtz,Tezos,unbacked
+xvg,Verge,unbacked
+yfi,Yearn.finance,unbacked
+zec,Zcash,unbacked
+zil_eth,Zilliqa (Ethereum),unbacked
+zrx,0x,unbacked
