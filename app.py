@@ -11,6 +11,8 @@ from plotly.subplots import make_subplots
 import pandas as pd
 import numpy as np
 import os
+import requests
+import base64
 from datetime import datetime
 
 # ============ CONSTANTS ============
@@ -1353,6 +1355,43 @@ def update_analysis_panel(figure, fiats, cryptos, metric, date_range):
     return rows
 
 
+def log_download_to_github(name, institution, email, timestamp):
+    """Append a download record to downloads.log in the GitHub repo."""
+    token = os.environ.get('GITHUB_TOKEN')
+    if not token:
+        print("[WARNING] GITHUB_TOKEN not set, skipping GitHub log")
+        return
+    
+    repo = 'emigiupponi/asymmetric-cryptoization'
+    path = 'downloads.log'
+    api_url = f'https://api.github.com/repos/{repo}/contents/{path}'
+    headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github.v3+json'}
+    
+    new_line = f"{timestamp} | {name} | {institution} | {email}\n"
+    
+    try:
+        r = requests.get(api_url, headers=headers)
+        if r.status_code == 200:
+            file_data = r.json()
+            existing = base64.b64decode(file_data['content']).decode('utf-8')
+            sha = file_data['sha']
+        else:
+            existing = "timestamp | name | institution | email\n"
+            sha = None
+        
+        updated = existing + new_line
+        encoded = base64.b64encode(updated.encode('utf-8')).decode('utf-8')
+        
+        payload = {'message': f'[log] Download by {name} ({institution})', 'content': encoded}
+        if sha:
+            payload['sha'] = sha
+        
+        requests.put(api_url, headers=headers, json=payload)
+        print(f"[GITHUB LOG] Saved to {path}")
+    except Exception as e:
+        print(f"[GITHUB LOG ERROR] {e}")
+
+
 # ============ DOWNLOAD CALLBACKS ============
 
 @app.callback(
@@ -1399,9 +1438,10 @@ def process_download(n_clicks, name, institution, email, exchanges, fiats, crypt
     if not name or not institution or not email:
         return dash.no_update, "Please fill in all fields."
     
-    # Log the download to Render logs
+    # Log the download to Render logs and GitHub
     timestamp = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')
     print(f"[DOWNLOAD] {name} | {institution} | {email} | {timestamp}")
+    log_download_to_github(name, institution, email, timestamp)
     
     # Prepare filtered data
     df = _data.copy()
