@@ -975,243 +975,142 @@ def update_chart(exchanges, fiats, cryptos, view, frequency, stacking, metric, c
         'Other Unbacked': 'rgba(229, 148, 0, 0.5)', # Naranja 50%
     }
     
-    # Build figure based on selections
-    if use_region_comparison:
-        # AEs vs EMDEs - ALWAYS 2 subplots (independent of crypto selection)
-        fig = make_subplots(rows=1, cols=2, subplot_titles=['AEs', 'EMDEs'], horizontal_spacing=0.08)
-        
-        # Determine crypto grouping
-        if use_fsb_4cat:
-            groups = ['USDT', 'Other Stables', 'BTC', 'Other Unbacked']
-        elif use_crypto_comparison:
-            groups = ['Stablecoins', 'Unbacked']
-        else:
-            groups = ['Total']
-        
-        for col_idx, region in enumerate(['AEs', 'EMDEs'], 1):
-            region_df = df[df['region'] == region]
-            
-            for group in groups:
-                if use_fsb_4cat:
-                    if group == 'USDT':
-                        group_df = region_df[region_df['base_asset'] == 'usdt']
-                    elif group == 'Other Stables':
-                        group_df = region_df[(region_df['crypto_type'] == 'Stablecoins') & (region_df['base_asset'] != 'usdt')]
-                    elif group == 'BTC':
-                        group_df = region_df[region_df['base_asset'] == 'btc']
-                    else:  # Other Unbacked
-                        group_df = region_df[(region_df['crypto_type'] == 'Unbacked') & (region_df['base_asset'] != 'btc')]
-                    color = FSB_COLORS[group]
-                elif use_crypto_comparison:
-                    group_df = region_df[region_df['crypto_type'] == group]
-                    color = COLORS.get(group, '#999')
-                else:
-                    group_df = region_df
-                    color = COLORS.get(region, '#999')
-                
-                agg_df = group_df.groupby('month')[metric].sum().reset_index()
-                agg_df = agg_df.sort_values('month')
-                
-                if stacking == 'percent':
-                    total_df = region_df.groupby('month')[metric].sum().reset_index()
-                    total_df.columns = ['month', 'total']
-                    agg_df = agg_df.merge(total_df, on='month')
-                    agg_df['value'] = agg_df[metric] / agg_df['total'] * 100
-                else:
-                    agg_df['value'] = agg_df[metric] / 1e9 if metric == 'volume_usd' else agg_df[metric]
-                
-                show_legend = (col_idx == 1)
-                name = group if groups != ['Total'] else region
-                
-                if chart_type == 'bar':
-                    fig.add_trace(go.Bar(
-                        x=agg_df['month'], y=agg_df['value'],
-                        name=name, marker_color=color, showlegend=show_legend
-                    ), row=1, col=col_idx)
-                else:
-                    fig.add_trace(go.Scatter(
-                        x=agg_df['month'], y=agg_df['value'],
-                        name=name, line=dict(color=color), mode='lines', showlegend=show_legend
-                    ), row=1, col=col_idx)
-        
-        fig.update_layout(barmode='stack' if chart_type == 'bar' else None)
-        y_title = 'Share (%)' if stacking == 'percent' else ('Vol. (USD B)' if metric == 'volume_usd' else 'Trades')
-        fig.update_yaxes(title=y_title, row=1, col=1)
+    # ============================================================
+    # PRE-PROCESS: Transform base_asset to reflect crypto groupings
+    # (Replicates local dashboard approach from _make_evolution_fig)
+    # This way, the chart-building loop ALWAYS iterates by base_asset.
+    # ============================================================
+    df = df.copy()
+    if use_fsb_4cat:
+        def _fsb_group(row):
+            if row['base_asset'] == 'usdt':
+                return 'USDT'
+            elif row['base_asset'] == 'btc':
+                return 'BTC'
+            elif row.get('crypto_type') == 'Stablecoins':
+                return 'Other Stables'
+            else:
+                return 'Other Unbacked'
+        df['base_asset'] = df.apply(_fsb_group, axis=1)
+    elif use_crypto_comparison:
+        df['base_asset'] = df['crypto_type']  # 'Stablecoins' or 'Unbacked'
     
+    # Determine region column and subplot structure
+    if use_region_comparison:
+        region_col = 'region'
+        regions = ['AEs', 'EMDEs']
+        subplot_titles = regions
     elif use_fiat_subplots:
-        # Multiple individual fiats - create subplot per fiat
-        n_fiats = len(individual_fiats)
+        region_col = 'quote_asset'
+        regions = individual_fiats
         subplot_titles = [FIAT_TO_COUNTRY_NAME.get(f, f.upper()) for f in individual_fiats]
-        print(f"[DEBUG SUBPLOTS] Creating {n_fiats} subplots for fiats={individual_fiats}, cryptos={cryptos}")
-        fig = make_subplots(rows=1, cols=n_fiats, subplot_titles=subplot_titles, 
+    else:
+        region_col = None
+        regions = None
+        subplot_titles = None
+    
+    # Merge all colors into one lookup for simplicity
+    ALL_COLORS = {**COLORS, **FSB_COLORS}
+    
+    # ============================================================
+    # BUILD FIGURE (unified logic, replicating local _make_evolution_fig)
+    # ============================================================
+    if regions and len(regions) >= 1:
+        # --- SUBPLOT MODE: one panel per region/fiat ---
+        n_panels = len(regions)
+        print(f"[DEBUG CHART] Subplot mode: {n_panels} panels, regions={regions}, base_assets={sorted(df['base_asset'].unique())}")
+        fig = make_subplots(rows=1, cols=n_panels, subplot_titles=subplot_titles,
                            horizontal_spacing=0.08)
         
-        # Determine grouping ONCE (same for all subplots)
-        if use_fsb_4cat:
-            group_mode = 'fsb_4cat'
-            group_names = ['USDT', 'Other Stables', 'BTC', 'Other Unbacked']
-        elif use_crypto_comparison:
-            group_mode = 'crypto_type'
-            group_names = ['Stablecoins', 'Unbacked']
-        elif cryptos and not any(c.startswith('SPECIAL:') for c in cryptos):
-            group_mode = 'individual_crypto'
-            group_names = sorted(df['base_asset'].unique())
-        else:
-            group_mode = 'total'
-            group_names = ['Total']
+        # Group data ONCE (like local dashboard line 880-889)
+        grouped = df.groupby(['month', region_col, 'base_asset'])[metric].sum().reset_index()
         
-        print(f"[DEBUG SUBPLOTS] group_mode={group_mode}, group_names={group_names}")
-        
-        for col_idx, fiat in enumerate(individual_fiats, 1):
-            fiat_df = df[df['quote_asset'] == fiat]
+        for col_idx, region in enumerate(regions, 1):
+            region_data = grouped[grouped[region_col] == region]
             
-            if fiat_df.empty:
-                print(f"[DEBUG SUBPLOTS] No data for fiat={fiat}, skipping")
+            if region_data.empty:
+                print(f"[DEBUG CHART] No data for region={region}, skipping")
                 continue
             
-            for group in group_names:
-                # Filter data for this group
-                if group_mode == 'fsb_4cat':
-                    if group == 'USDT':
-                        group_df = fiat_df[fiat_df['base_asset'] == 'usdt']
-                    elif group == 'Other Stables':
-                        group_df = fiat_df[(fiat_df['crypto_type'] == 'Stablecoins') & (fiat_df['base_asset'] != 'usdt')]
-                    elif group == 'BTC':
-                        group_df = fiat_df[fiat_df['base_asset'] == 'btc']
-                    else:
-                        group_df = fiat_df[(fiat_df['crypto_type'] == 'Unbacked') & (fiat_df['base_asset'] != 'btc')]
-                    color = FSB_COLORS[group]
-                    name = group
-                elif group_mode == 'crypto_type':
-                    group_df = fiat_df[fiat_df['crypto_type'] == group]
-                    color = COLORS.get(group, '#999')
-                    name = group
-                elif group_mode == 'individual_crypto':
-                    group_df = fiat_df[fiat_df['base_asset'] == group]
-                    color = COLORS.get(group, COLORS.get(group.lower(), '#0071BC'))
-                    name = group.upper()
-                else:
-                    group_df = fiat_df
-                    color = COLORS.get(fiat, '#0071BC')
-                    name = fiat.upper()
+            # Compute totals for percent stacking
+            if stacking == 'percent':
+                totals = region_data.groupby('month')[metric].sum().reset_index()
+                totals.columns = ['month', '_total']
+            
+            cryptos_in_region = sorted(region_data['base_asset'].unique())
+            
+            for crypto in cryptos_in_region:
+                crypto_data = region_data[region_data['base_asset'] == crypto].sort_values('month')
                 
-                if group_df.empty:
+                if crypto_data.empty:
                     continue
                 
-                agg_df = group_df.groupby('month')[metric].sum().reset_index()
-                agg_df = agg_df.sort_values('month')
-                
+                # Compute y values
                 if stacking == 'percent':
-                    total_df = fiat_df.groupby('month')[metric].sum().reset_index()
-                    total_df.columns = ['month', 'total']
-                    agg_df = agg_df.merge(total_df, on='month')
-                    agg_df['value'] = agg_df[metric] / agg_df['total'] * 100
+                    crypto_data = crypto_data.merge(totals, on='month')
+                    y_vals = crypto_data[metric] / crypto_data['_total'] * 100
                 else:
-                    agg_df['value'] = agg_df[metric] / 1e9 if metric == 'volume_usd' else agg_df[metric]
+                    y_vals = crypto_data[metric] / 1e9 if metric == 'volume_usd' else crypto_data[metric]
                 
+                color = ALL_COLORS.get(crypto, ALL_COLORS.get(crypto.lower(), '#999'))
+                name = crypto.upper() if crypto not in FSB_COLORS else crypto
                 show_legend = (col_idx == 1)
-                legend_group = group if group_mode != 'total' else fiat
                 
                 if chart_type == 'bar':
                     fig.add_trace(go.Bar(
-                        x=agg_df['month'], y=agg_df['value'],
-                        name=name, marker_color=color, showlegend=show_legend,
-                        legendgroup=legend_group
+                        x=crypto_data['month'], y=y_vals,
+                        name=name, marker_color=color,
+                        showlegend=show_legend, legendgroup=crypto
                     ), row=1, col=col_idx)
                 else:
                     fig.add_trace(go.Scatter(
-                        x=agg_df['month'], y=agg_df['value'],
-                        name=name, line=dict(color=color), mode='lines', showlegend=show_legend,
-                        legendgroup=legend_group
+                        x=crypto_data['month'], y=y_vals,
+                        name=name, line=dict(color=color), mode='lines',
+                        showlegend=show_legend, legendgroup=crypto
                     ), row=1, col=col_idx)
         
         fig.update_layout(barmode='stack' if chart_type == 'bar' else None)
         y_title = 'Share (%)' if stacking == 'percent' else ('Vol. (USD B)' if metric == 'volume_usd' else 'Trades')
         fig.update_yaxes(title=y_title, row=1, col=1)
     
-    elif use_fsb_4cat:
-        # FSB 4 categories without region comparison - single chart
-        fig = go.Figure()
-        groups = ['USDT', 'Other Stables', 'BTC', 'Other Unbacked']
-        
-        for group in groups:
-            if group == 'USDT':
-                group_df = df[df['base_asset'] == 'usdt']
-            elif group == 'Other Stables':
-                group_df = df[(df['crypto_type'] == 'Stablecoins') & (df['base_asset'] != 'usdt')]
-            elif group == 'BTC':
-                group_df = df[df['base_asset'] == 'btc']
-            else:
-                group_df = df[(df['crypto_type'] == 'Unbacked') & (df['base_asset'] != 'btc')]
-            
-            agg_df = group_df.groupby('month')[metric].sum().reset_index()
-            agg_df = agg_df.sort_values('month')
-            
-            if stacking == 'percent':
-                total_df = df.groupby('month')[metric].sum().reset_index()
-                total_df.columns = ['month', 'total']
-                agg_df = agg_df.merge(total_df, on='month')
-                agg_df['value'] = agg_df[metric] / agg_df['total'] * 100
-            else:
-                agg_df['value'] = agg_df[metric] / 1e9 if metric == 'volume_usd' else agg_df[metric]
-            
-            color = FSB_COLORS[group]
-            
-            if chart_type == 'bar':
-                fig.add_trace(go.Bar(x=agg_df['month'], y=agg_df['value'], name=group, marker_color=color))
-            else:
-                fig.add_trace(go.Scatter(x=agg_df['month'], y=agg_df['value'], name=group, 
-                                        line=dict(color=color), mode='lines'))
-        
-        y_title = 'Share (%)' if stacking == 'percent' else ('Volume (USD B)' if metric == 'volume_usd' else 'Trades')
-        y_range = [0, 100] if stacking == 'percent' else None
-        
-        fig.update_layout(barmode='stack' if chart_type == 'bar' else None)
-        fig.update_yaxes(title=y_title, range=y_range)
-        
     else:
-        # Single chart - group by appropriate dimension
+        # --- SINGLE CHART MODE (no subplots) ---
         fig = go.Figure()
         
-        if use_crypto_comparison:
-            group_col = 'crypto_type'
-            groups = ['Stablecoins', 'Unbacked']
-        elif use_region_comparison:
-            group_col = 'region'
-            groups = df['region'].unique()
-        else:
-            # Group by individual crypto or fiat
-            if cryptos and not any(c.startswith('SPECIAL:') for c in cryptos):
-                group_col = 'base_asset'
-            else:
-                group_col = 'quote_asset'
-            groups = df[group_col].unique()
+        # Determine what to iterate over
+        cryptos_available = sorted(df['base_asset'].unique())
         
-        for group in groups:
-            group_df = df[df[group_col] == group]
-            agg_df = group_df.groupby('month')[metric].sum().reset_index()
-            agg_df = agg_df.sort_values('month')
+        # Group data
+        grouped = df.groupby(['month', 'base_asset'])[metric].sum().reset_index()
+        
+        # Compute totals for percent stacking
+        if stacking == 'percent':
+            totals = grouped.groupby('month')[metric].sum().reset_index()
+            totals.columns = ['month', '_total']
+        
+        for crypto in cryptos_available:
+            crypto_data = grouped[grouped['base_asset'] == crypto].sort_values('month')
+            
+            if crypto_data.empty:
+                continue
             
             if stacking == 'percent':
-                total_df = df.groupby('month')[metric].sum().reset_index()
-                total_df.columns = ['month', 'total']
-                agg_df = agg_df.merge(total_df, on='month')
-                agg_df['value'] = agg_df[metric] / agg_df['total'] * 100
+                crypto_data = crypto_data.merge(totals, on='month')
+                y_vals = crypto_data[metric] / crypto_data['_total'] * 100
             else:
-                agg_df['value'] = agg_df[metric] / 1e9 if metric == 'volume_usd' else agg_df[metric]
+                y_vals = crypto_data[metric] / 1e9 if metric == 'volume_usd' else crypto_data[metric]
             
-            color = COLORS.get(group, COLORS.get(group.lower(), '#999'))
+            color = ALL_COLORS.get(crypto, ALL_COLORS.get(crypto.lower(), '#999'))
+            name = crypto.upper() if crypto not in FSB_COLORS else crypto
             
             if chart_type == 'bar':
-                fig.add_trace(go.Bar(x=agg_df['month'], y=agg_df['value'], name=str(group).upper(), 
-                                    marker_color=color))
+                fig.add_trace(go.Bar(x=crypto_data['month'], y=y_vals, name=name, marker_color=color))
             else:
-                fig.add_trace(go.Scatter(x=agg_df['month'], y=agg_df['value'], name=str(group).upper(),
+                fig.add_trace(go.Scatter(x=crypto_data['month'], y=y_vals, name=name,
                                         line=dict(color=color), mode='lines'))
         
         y_title = 'Share (%)' if stacking == 'percent' else ('Volume (USD B)' if metric == 'volume_usd' else 'Trades')
         y_range = [0, 100] if stacking == 'percent' else None
-        
         fig.update_layout(barmode='stack' if chart_type == 'bar' else None)
         fig.update_yaxes(title=y_title, range=y_range)
     
