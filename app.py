@@ -1042,24 +1042,36 @@ def update_chart(exchanges, fiats, cryptos, view, frequency, stacking, metric, c
         # Multiple individual fiats - create subplot per fiat
         n_fiats = len(individual_fiats)
         subplot_titles = [FIAT_TO_COUNTRY_NAME.get(f, f.upper()) for f in individual_fiats]
+        print(f"[DEBUG SUBPLOTS] Creating {n_fiats} subplots for fiats={individual_fiats}, cryptos={cryptos}")
         fig = make_subplots(rows=1, cols=n_fiats, subplot_titles=subplot_titles, 
-                           horizontal_spacing=0.08, shared_yaxes=True)
+                           horizontal_spacing=0.08)
+        
+        # Determine grouping ONCE (same for all subplots)
+        if use_fsb_4cat:
+            group_mode = 'fsb_4cat'
+            group_names = ['USDT', 'Other Stables', 'BTC', 'Other Unbacked']
+        elif use_crypto_comparison:
+            group_mode = 'crypto_type'
+            group_names = ['Stablecoins', 'Unbacked']
+        elif cryptos and not any(c.startswith('SPECIAL:') for c in cryptos):
+            group_mode = 'individual_crypto'
+            group_names = sorted(df['base_asset'].unique())
+        else:
+            group_mode = 'total'
+            group_names = ['Total']
+        
+        print(f"[DEBUG SUBPLOTS] group_mode={group_mode}, group_names={group_names}")
         
         for col_idx, fiat in enumerate(individual_fiats, 1):
             fiat_df = df[df['quote_asset'] == fiat]
             
-            # Determine grouping
-            if use_fsb_4cat:
-                groups = ['USDT', 'Other Stables', 'BTC', 'Other Unbacked']
-            elif use_crypto_comparison:
-                groups = ['Stablecoins', 'Unbacked']
-            elif cryptos and not any(c.startswith('SPECIAL:') for c in cryptos):
-                groups = fiat_df['base_asset'].unique()
-            else:
-                groups = ['Total']
+            if fiat_df.empty:
+                print(f"[DEBUG SUBPLOTS] No data for fiat={fiat}, skipping")
+                continue
             
-            for group in groups:
-                if use_fsb_4cat:
+            for group in group_names:
+                # Filter data for this group
+                if group_mode == 'fsb_4cat':
                     if group == 'USDT':
                         group_df = fiat_df[fiat_df['base_asset'] == 'usdt']
                     elif group == 'Other Stables':
@@ -1069,15 +1081,22 @@ def update_chart(exchanges, fiats, cryptos, view, frequency, stacking, metric, c
                     else:
                         group_df = fiat_df[(fiat_df['crypto_type'] == 'Unbacked') & (fiat_df['base_asset'] != 'btc')]
                     color = FSB_COLORS[group]
-                elif use_crypto_comparison:
+                    name = group
+                elif group_mode == 'crypto_type':
                     group_df = fiat_df[fiat_df['crypto_type'] == group]
                     color = COLORS.get(group, '#999')
-                elif groups != ['Total']:
+                    name = group
+                elif group_mode == 'individual_crypto':
                     group_df = fiat_df[fiat_df['base_asset'] == group]
-                    color = COLORS.get(group, COLORS.get(str(group).lower(), '#0071BC'))
+                    color = COLORS.get(group, COLORS.get(group.lower(), '#0071BC'))
+                    name = group.upper()
                 else:
                     group_df = fiat_df
-                    color = '#0071BC'
+                    color = COLORS.get(fiat, '#0071BC')
+                    name = fiat.upper()
+                
+                if group_df.empty:
+                    continue
                 
                 agg_df = group_df.groupby('month')[metric].sum().reset_index()
                 agg_df = agg_df.sort_values('month')
@@ -1091,17 +1110,19 @@ def update_chart(exchanges, fiats, cryptos, view, frequency, stacking, metric, c
                     agg_df['value'] = agg_df[metric] / 1e9 if metric == 'volume_usd' else agg_df[metric]
                 
                 show_legend = (col_idx == 1)
-                name = str(group).upper() if group != 'Total' else fiat.upper()
+                legend_group = group if group_mode != 'total' else fiat
                 
                 if chart_type == 'bar':
                     fig.add_trace(go.Bar(
                         x=agg_df['month'], y=agg_df['value'],
-                        name=name, marker_color=color, showlegend=show_legend
+                        name=name, marker_color=color, showlegend=show_legend,
+                        legendgroup=legend_group
                     ), row=1, col=col_idx)
                 else:
                     fig.add_trace(go.Scatter(
                         x=agg_df['month'], y=agg_df['value'],
-                        name=name, line=dict(color=color), mode='lines', showlegend=show_legend
+                        name=name, line=dict(color=color), mode='lines', showlegend=show_legend,
+                        legendgroup=legend_group
                     ), row=1, col=col_idx)
         
         fig.update_layout(barmode='stack' if chart_type == 'bar' else None)
