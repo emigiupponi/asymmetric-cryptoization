@@ -11,6 +11,7 @@ from plotly.subplots import make_subplots
 import pandas as pd
 import numpy as np
 import os
+from datetime import datetime
 
 # ============ CONSTANTS ============
 
@@ -755,11 +756,63 @@ app.layout = html.Div(style=CONTAINER_STYLE, children=[
                         html.A("GitHub", href="https://github.com/emigiupponi/asymmetric-cryptoization", 
                                target="_blank", style={'color': WB['primary'], 'fontSize': '12px', 'textDecoration': 'none'}),
                     ]),
+                    # Download Data button
+                    html.Div(style={'padding': '12px 15px', 'textAlign': 'center', 'borderTop': '1px solid #d5d8dc'}, children=[
+                        html.Button("Download Data", id='btn-open-download', n_clicks=0,
+                                    style={'backgroundColor': WB['primary'], 'color': '#fff', 'border': 'none',
+                                           'borderRadius': '2px', 'padding': '8px 24px', 'fontSize': '13px',
+                                           'cursor': 'pointer', 'fontFamily': FONT, 'fontWeight': '600'}),
+                    ]),
                 ]),
             ]),  # End right column
             
         ]),  # End main content area
     ]),  # End wrapper
+    
+    # ===== DOWNLOAD MODAL =====
+    html.Div(id='download-modal', style={'display': 'none', 'position': 'fixed', 'top': '0', 'left': '0',
+                                          'width': '100%', 'height': '100%', 'backgroundColor': 'rgba(0,0,0,0.5)',
+                                          'zIndex': '9999', 'justifyContent': 'center', 'alignItems': 'center'}, children=[
+        html.Div(style={'backgroundColor': '#fff', 'borderRadius': '4px', 'padding': '30px', 'width': '420px',
+                        'maxWidth': '90%', 'margin': 'auto', 'marginTop': '15vh', 'boxShadow': '0 4px 20px rgba(0,0,0,0.15)'}, children=[
+            html.H3("Download Data", style={'margin': '0 0 6px 0', 'color': WB['text_dark'], 'fontSize': '18px', 'fontFamily': FONT}),
+            html.P("Please provide your institutional details for our records.", 
+                   style={'color': WB['text_muted'], 'fontSize': '13px', 'margin': '0 0 20px 0', 'fontFamily': FONT}),
+            # Name
+            html.Label("Name", style={'fontSize': '12px', 'color': WB['text_muted'], 'textTransform': 'uppercase', 
+                                      'fontWeight': '600', 'fontFamily': FONT}),
+            dcc.Input(id='download-name', type='text', placeholder='Your name',
+                     style={'width': '100%', 'padding': '8px 12px', 'border': f"1px solid {WB['border']}", 
+                            'borderRadius': '2px', 'fontSize': '14px', 'marginBottom': '12px', 'boxSizing': 'border-box'}),
+            # Institution
+            html.Label("Institution", style={'fontSize': '12px', 'color': WB['text_muted'], 'textTransform': 'uppercase',
+                                             'fontWeight': '600', 'fontFamily': FONT}),
+            dcc.Input(id='download-institution', type='text', placeholder='e.g. Bank of England',
+                     style={'width': '100%', 'padding': '8px 12px', 'border': f"1px solid {WB['border']}",
+                            'borderRadius': '2px', 'fontSize': '14px', 'marginBottom': '12px', 'boxSizing': 'border-box'}),
+            # Email
+            html.Label("Email", style={'fontSize': '12px', 'color': WB['text_muted'], 'textTransform': 'uppercase',
+                                       'fontWeight': '600', 'fontFamily': FONT}),
+            dcc.Input(id='download-email', type='email', placeholder='your.email@institution.org',
+                     style={'width': '100%', 'padding': '8px 12px', 'border': f"1px solid {WB['border']}",
+                            'borderRadius': '2px', 'fontSize': '14px', 'marginBottom': '20px', 'boxSizing': 'border-box'}),
+            # Buttons
+            html.Div(style={'display': 'flex', 'gap': '10px', 'justifyContent': 'flex-end'}, children=[
+                html.Button("Cancel", id='btn-cancel-download', n_clicks=0,
+                            style={'backgroundColor': WB['button_bg'], 'color': WB['text'], 'border': f"1px solid {WB['border']}",
+                                   'borderRadius': '2px', 'padding': '8px 20px', 'fontSize': '13px', 'cursor': 'pointer'}),
+                html.Button("Download CSV", id='btn-confirm-download', n_clicks=0,
+                            style={'backgroundColor': WB['primary'], 'color': '#fff', 'border': 'none',
+                                   'borderRadius': '2px', 'padding': '8px 20px', 'fontSize': '13px', 'cursor': 'pointer',
+                                   'fontWeight': '600'}),
+            ]),
+            # Validation message
+            html.Div(id='download-validation', style={'marginTop': '10px', 'fontSize': '12px', 'color': '#e74c3c'}),
+        ]),
+    ]),
+    
+    # Download component
+    dcc.Download(id='download-data'),
 ])
 
 # ============ CALLBACKS ============
@@ -1298,6 +1351,93 @@ def update_analysis_panel(figure, fiats, cryptos, metric, date_range):
         rows.append(html.Div(f"Error: {str(e)}", style={'padding': '10px', 'color': '#999'}))
     
     return rows
+
+
+# ============ DOWNLOAD CALLBACKS ============
+
+@app.callback(
+    Output('download-modal', 'style'),
+    [Input('btn-open-download', 'n_clicks'),
+     Input('btn-cancel-download', 'n_clicks'),
+     Input('btn-confirm-download', 'n_clicks')],
+    [State('download-modal', 'style'),
+     State('download-name', 'value'),
+     State('download-institution', 'value'),
+     State('download-email', 'value')],
+    prevent_initial_call=True
+)
+def toggle_download_modal(open_clicks, cancel_clicks, confirm_clicks, current_style, name, institution, email):
+    ctx = dash.callback_context
+    if not ctx.triggered:
+        return current_style
+    trigger = ctx.triggered[0]['prop_id'].split('.')[0]
+    
+    if trigger == 'btn-open-download':
+        return {**current_style, 'display': 'flex'}
+    elif trigger == 'btn-cancel-download':
+        return {**current_style, 'display': 'none'}
+    elif trigger == 'btn-confirm-download':
+        if name and institution and email:
+            return {**current_style, 'display': 'none'}
+    return current_style
+
+
+@app.callback(
+    [Output('download-data', 'data'),
+     Output('download-validation', 'children')],
+    Input('btn-confirm-download', 'n_clicks'),
+    [State('download-name', 'value'),
+     State('download-institution', 'value'),
+     State('download-email', 'value'),
+     State('exchange-selector', 'value'),
+     State('fiat-selector', 'value'),
+     State('crypto-selector', 'value'),
+     State('date-slider', 'value')],
+    prevent_initial_call=True
+)
+def process_download(n_clicks, name, institution, email, exchanges, fiats, cryptos, date_range):
+    if not name or not institution or not email:
+        return dash.no_update, "Please fill in all fields."
+    
+    # Log the download to Render logs
+    timestamp = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')
+    print(f"[DOWNLOAD] {name} | {institution} | {email} | {timestamp}")
+    
+    # Prepare filtered data
+    df = _data.copy()
+    
+    start_date = _index_to_date(date_range[0])
+    end_date = _index_to_date(date_range[1])
+    df = df[(df['month'] >= start_date) & (df['month'] <= end_date)]
+    
+    # Apply filters
+    clean_exchanges = [e for e in (exchanges or []) if not e.startswith('EXCL:') and not e.startswith('SEP')]
+    if clean_exchanges and 'all' not in clean_exchanges:
+        df = df[df['exchange'].isin(clean_exchanges)]
+    
+    clean_fiats = [f for f in (fiats or []) if not f.startswith('SPECIAL:') and not f.startswith('SEP') and not f.startswith('EXCL:')]
+    special_fiats = [f for f in (fiats or []) if f.startswith('SPECIAL:')]
+    if 'SPECIAL:AE' in special_fiats:
+        df = df[df['region'] == 'AEs']
+    elif 'SPECIAL:EMDE' in special_fiats:
+        df = df[df['region'] == 'EMDEs']
+    elif clean_fiats:
+        df = df[df['quote_asset'].isin(clean_fiats)]
+    
+    clean_cryptos = [c for c in (cryptos or []) if not c.startswith('SPECIAL:') and not c.startswith('SEP') and not c.startswith('EXCL:')]
+    special_cryptos = [c for c in (cryptos or []) if c.startswith('SPECIAL:')]
+    if 'SPECIAL:STABLECOINS' in special_cryptos:
+        df = df[df['crypto_type'] == 'Stablecoins']
+    elif 'SPECIAL:UNBACKED' in special_cryptos:
+        df = df[df['crypto_type'] == 'Unbacked']
+    elif clean_cryptos:
+        df = df[df['base_asset'].isin(clean_cryptos)]
+    
+    # Select columns for export
+    export_cols = ['month', 'exchange', 'base_asset', 'quote_asset', 'region', 'crypto_type', 'volume_usd', 'number_of_trades']
+    export_df = df[[c for c in export_cols if c in df.columns]]
+    
+    return dcc.send_data_frame(export_df.to_csv, "asymmetric_cryptoization_data.csv", index=False), ""
 
 
 # ============ RUN ============
